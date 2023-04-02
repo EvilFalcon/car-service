@@ -241,6 +241,7 @@ namespace Car_Service
             _carFactory = carFactory;
         }
 
+        
         public List<Person> Build(int minCountQueue, int maxCountQueue) =>
             AddPersons(minCountQueue, maxCountQueue);
 
