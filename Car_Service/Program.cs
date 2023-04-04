@@ -1,5 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Diagnostics;
+using System.Linq;
 using System.Runtime.InteropServices;
 
 namespace Car_Service
@@ -8,10 +10,11 @@ namespace Car_Service
     {
         public static void Main(string[] args)
         {
-            DetailFactory detailFactory = new DetailFactory();
-            Service service = new Service(detailFactory);
+            MainBuilder mainBuilder = new MainBuilder();
+            Service service = mainBuilder.BuildService();
             service.Open();
-            Console.ReadKey();
+
+            PartsConfig config = new PartsConfig();
         }
     }
 
@@ -67,80 +70,144 @@ namespace Car_Service
         }
     }
 
-    public class Storage
+    public class Container
     {
-        private Dictionary<string, int> _details;
+        private readonly int _maxCountDetail;
+        private Queue<Detail> _details = new Queue<Detail>();
 
-        public Storage(Dictionary<string, int> details)
+        public Container(int config)
         {
-            _details = details;
+            _maxCountDetail = config;
         }
 
-        public bool IsAvailable(string nameDetails)
+        public Container(Container container)
         {
-            if (_details.ContainsKey(nameDetails) == false)
-                return false;
-            
-            if (_details[nameDetails] < 0)
-                return false;
+            Name = container.Name;
+            _details = container._details;
+        }
 
-            return true;
+        public string Name { get; }
+        public int CountDitail => _details.Count;
+        public int Price { get; private set; } = 0;
+
+        public Detail GiveDetail()
+        {
+            Detail detail = _details.Dequeue();
+            return detail;
+        }
+
+        public void TakeDetail(Detail details)
+        {
+            Price += details.Price;
+            _details.Enqueue(details);
+        }
+
+        public void TakeDetail(List<Detail> details)
+        {
+            _details = (Queue<Detail>)_details.Concat(details);
+        }
+    }
+
+    public class Storage
+    {
+        private Dictionary<string, Container> _contaners;
+
+        public Storage(Dictionary<string, Container> details)
+        {
+            _contaners = details;
+        }
+
+        public Detail IsAvailable(string nameDetails)
+        {
+            if (_contaners.ContainsKey(nameDetails) == false)
+                return null;
+
+            if (_contaners[nameDetails].CountDitail < 0)
+                return null;
+
+            return _contaners[nameDetails].GiveDetail();
         }
 
         public void ShowInfo()
         {
-            foreach (var detail in _details)
+            foreach (var detail in _contaners)
             {
-                Console.WriteLine($"{detail.Key}  {detail.Value}");
+                Console.WriteLine($"{detail.Key}  {detail.Value.CountDitail}");
             }
         }
     }
 
+    public class ShopContainerDetail
+    {
+        private List<Container> _conteiners;
+
+        public ShopContainerDetail(List<Container> conteiners)
+        {
+            _conteiners = conteiners;
+        }
+
+        //public Container SellDetails(string nameDetail)
+        //{
+        //    foreach (var conteiner in _conteiners)
+        //    {
+        //        if (conteiner.Name == nameDetail)
+        //        {
+        //            Container container = new Container(conteiner);
+        //        }
+        //    }
+        //}
+    }
+
     public class Service
     {
-        private readonly PersonListBuilder _builder;
-        private readonly DetailFactory factory;
-        private readonly PartsConfig _config;
+        private PersonListBuilder _builder;
         private Storage _storage;
         private List<Person> _persons;
-        private int _money = 50000;
+        private int _money;
+        private ShopContainerDetail _shop;
+        private ServiceConfig _config;
 
-        public Service(DetailFactory factory, PartsConfig config, Storage storage)
+        public Service(Storage storage, List<Person> persons, PersonListBuilder builder, ShopContainerDetail shop,
+            ServiceConfig config,
+            int money)
         {
-            this.factory = factory;
-            _config = config;
+            _money = money;
+            _persons = persons;
             _storage = storage;
+            _builder = builder;
+            _shop = shop;
+            _config = config;
         }
 
         public void Open()
         {
-            FillStorage();
             Work();
         }
 
-        private void FillStorage()
+        public void AddPersonList(Person[] persons)
         {
-            Dictionary<string, int> details = new Dictionary<string, int>();
-            Part[] parts = _config.GetParts();
-
-            for (int i = 0; i < parts.Length; i++)
-            {
-                string name = parts[i].Name;
-                int count = Utils.GetRandomNumber(ServiceConfig.MinPersonQueue, ServiceConfig.MaxPersonQueue);
-                details.Add(name, count);
-            }
-
-            _storage = new Storage(details);
+            _persons.AddRange(persons.ToList());
         }
 
         private void Work()
         {
-            _storage.ShowInfo();
+            while (_persons.Count > 0 && _money >= 0)
+            {
+                _storage.ShowInfo();
+            }
         }
 
-        private void FixCarDitail()
+        private void FixCarDetail(Detail detail)
         {
-            if (_storage.IsAvailable()==false)
+            detail.Fix();
+        }
+
+        private bool TryPau(int price)
+        {
+            if (_money < price)
+                return false;
+
+            return true;
         }
     }
 
@@ -153,12 +220,12 @@ namespace Car_Service
             int number = _random.Next(value + 1);
             return number;
         }
-        
+
         public static int GetRandomNumber(int minValue, int maxValue)
         {
             return _random.Next(minValue, maxValue + 1);
         }
-        
+
         public static bool GetBoolRandom()
         {
             return _random.Next(1) == 0;
@@ -189,7 +256,7 @@ namespace Car_Service
         {
             IsWhole = true;
         }
-        
+
         private string GetStats()
         {
             if (IsWhole == false)
@@ -210,16 +277,17 @@ namespace Car_Service
     public class CarFactory
     {
         private readonly DetailFactory _detailFactory;
+        private readonly PartsConfig _config;
 
-        public CarFactory(DetailFactory detailFactory)
+        public CarFactory(DetailFactory detailFactory, PartsConfig config)
         {
             _detailFactory = detailFactory;
+            _config = config;
         }
 
         public Car Create()
         {
-            PartsConfig config = new PartsConfig();
-            Part[] parts = config.GetParts();
+            Part[] parts = _config.GetParts();
 
             List<Detail> details = new List<Detail>();
 
@@ -232,16 +300,114 @@ namespace Car_Service
         }
     }
 
+    public class MainBuilder
+    {
+        private PartsConfig _partsConfig = new PartsConfig();
+        private ShopConfig _shopConfig = new ShopConfig();
+        private DetailFactory _detailFactory = new DetailFactory();
+        private ContainerConfig _containerConfig = new ContainerConfig();
+        private ServiceConfig _serviceConfig = new ServiceConfig();
+        private CarFactory _carFactory;
+
+        private PersonListBuilder _personListBuilder;
+        private ContainerBuilder _containerBuilder;
+        private ServiceBuilder _serviceBuilder;
+
+        public MainBuilder()
+        {
+            _carFactory = new CarFactory(_detailFactory, _partsConfig);
+            _personListBuilder = new PersonListBuilder(_carFactory);
+            _containerBuilder = new ContainerBuilder(_detailFactory, _partsConfig, _containerConfig);
+            _serviceBuilder = new ServiceBuilder(_containerBuilder, _personListBuilder, _shopConfig, _serviceConfig);
+        }
+
+        public Service BuildService()
+        {
+            return _serviceBuilder.Build();
+        }
+    }
+
+    public class ServiceBuilder
+    {
+        private readonly ContainerBuilder _containerBuilder;
+        private readonly PersonListBuilder _personListBuilder;
+        private readonly ShopConfig _shopConfig;
+        private readonly ServiceConfig _serviceConfig;
+
+        public ServiceBuilder(
+            ContainerBuilder containerBuilder,
+            PersonListBuilder personListBuilder,
+            ShopConfig shopConfig,
+            ServiceConfig serviceConfig
+        )
+        {
+            _containerBuilder = containerBuilder;
+            _personListBuilder = personListBuilder;
+            _shopConfig = shopConfig;
+            _serviceConfig = serviceConfig;
+        }
+
+        public Service Build()
+        {
+            Storage storage = new Storage(_containerBuilder.CreateNewCollections());
+            ShopContainerDetail shop =
+                new ShopContainerDetail(_containerBuilder.CreateNewCollections().Values.ToList());
+            List<Person> persons = _personListBuilder.Build(_serviceConfig.MinPersonList, _serviceConfig.MaxPersonList);
+            return new Service(storage, persons,_personListBuilder, shop, _serviceConfig, _serviceConfig.Money);
+        }
+    }
+
+    public class ContainerBuilder
+    {
+        private readonly DetailFactory _detailFactory;
+        private readonly ContainerConfig _containerConfig;
+        private readonly List<Part> _partsConfig = new List<Part>();
+
+        public ContainerBuilder(
+            DetailFactory detailFactory,
+            PartsConfig partsConfig,
+            ContainerConfig containerConfig
+        )
+        {
+            _detailFactory = detailFactory;
+            _containerConfig = containerConfig;
+            _partsConfig.AddRange(partsConfig.GetParts());
+        }
+
+        public Dictionary<string, Container> CreateNewCollections()
+        {
+            Dictionary<string, Container> containers = new Dictionary<string, Container>();
+
+            foreach (var part in _partsConfig)
+            {
+                containers.Add(part.Name, Create(part));
+            }
+
+            return containers;
+        }
+
+        private Container Create(Part part)
+        {
+            Container container = new Container(_containerConfig.MaxCountDetail);
+
+            for (int i = 0; i < _containerConfig.MaxCountDetail; i++)
+            {
+                container.TakeDetail(_detailFactory.Create(part.Name, part.Price));
+            }
+
+            return container;
+        }
+    }
+
     public class PersonListBuilder
     {
         private readonly CarFactory _carFactory;
 
-        public PersonListBuilder(CarFactory carFactory, DetailFactory detailFactory)
+        public PersonListBuilder(CarFactory carFactory)
         {
             _carFactory = carFactory;
         }
 
-        
         public List<Person> Build(int minCountQueue, int maxCountQueue) =>
             AddPersons(minCountQueue, maxCountQueue);
 
@@ -267,10 +433,12 @@ namespace Car_Service
         }
     }
 
-    public static class ServiceConfig
+    public class ServiceConfig
     {
-        public static int MaxPersonQueue { get; } = 50;
-        public static int MinPersonQueue { get; } = 5;
+        public int MaxPersonList { get; } = 50;
+        public int MinPersonList { get; } = 5;
+
+        public int Money { get; } = 55555;
     }
 
     public class PartsConfig
@@ -287,6 +455,16 @@ namespace Car_Service
         {
             return _parts.ToArray();
         }
+    }
+
+    public class ContainerConfig
+    {
+        public int MaxCountDetail = 15;
+    }
+
+    public class ShopConfig
+    {
+        public int SellCountDetail { get; } = 10;
     }
 
     public class Part
