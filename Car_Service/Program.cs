@@ -13,14 +13,12 @@ namespace Car_Service
             MainBuilder mainBuilder = new MainBuilder();
             Service service = mainBuilder.BuildService();
             service.Open();
-
-            PartsConfig config = new PartsConfig();
         }
     }
 
     public class Person
     {
-        public Car _car;
+        private Car _car;
         private int _money = 1000000;
 
         public Person(Car car)
@@ -41,9 +39,6 @@ namespace Car_Service
         public Car(List<Detail> details) =>
             _details = details;
 
-        public void AddDetails(List<Detail> details) =>
-            _details.AddRange(details);
-
         public Detail[] RemoveDetail()
         {
             Detail[] filmedDetails = new Detail[_details.Count];
@@ -51,29 +46,23 @@ namespace Car_Service
             for (int i = 0; i < _details.Count; i++)
             {
                 filmedDetails[i] = _details[i];
+                
+                
             }
 
             _details.Clear();
             return filmedDetails;
         }
 
-        public void ShowInfo()
-        {
-            Console.WriteLine("информация о состоянии машины");
-
-            Console.WriteLine("деталь   статус");
-
-            foreach (var detail in _details)
-            {
-                detail.ShowInfoStats();
-            }
-        }
+        public void ReturnParts(Detail[] details) =>
+            _details.AddRange(details);
     }
 
     public class Container
     {
         private readonly int _maxCountDetail;
         private Queue<Detail> _details = new Queue<Detail>();
+        private int _price;
 
         public Container(int config)
         {
@@ -88,17 +77,17 @@ namespace Car_Service
 
         public string Name { get; }
         public int CountDitail => _details.Count;
-        public int Price { get; private set; } = 0;
 
         public Detail GiveDetail()
         {
             Detail detail = _details.Dequeue();
             return detail;
+            
         }
 
         public void TakeDetail(Detail details)
         {
-            Price += details.Price;
+            _price += details.Price;
             _details.Enqueue(details);
         }
 
@@ -117,12 +106,12 @@ namespace Car_Service
             _contaners = details;
         }
 
-        public Detail IsAvailable(string nameDetails)
+        public Detail GiveDetail(string nameDetails)
         {
             if (_contaners.ContainsKey(nameDetails) == false)
                 return null;
 
-            if (_contaners[nameDetails].CountDitail < 0)
+            if (_contaners[nameDetails].CountDitail <= 0)
                 return null;
 
             return _contaners[nameDetails].GiveDetail();
@@ -160,14 +149,21 @@ namespace Car_Service
 
     public class Service
     {
+        private Queue<Person> _persons;
+        private List<Detail> _brokenParts = new List<Detail>();
+        private List<Detail> _detailsCar;
+        private Car _clientCar;
+
         private PersonListBuilder _builder;
         private Storage _storage;
-        private List<Person> _persons;
-        private int _money;
         private ShopContainerDetail _shop;
         private ServiceConfig _config;
 
-        public Service(Storage storage, List<Person> persons, PersonListBuilder builder, ShopContainerDetail shop,
+        private int _money;
+        private int _priceRepair;
+        private float _repairPercentage = 1.2f;
+
+        public Service(Storage storage, Queue<Person> persons, PersonListBuilder builder, ShopContainerDetail shop,
             ServiceConfig config,
             int money)
         {
@@ -184,22 +180,126 @@ namespace Car_Service
             Work();
         }
 
-        public void AddPersonList(Person[] persons)
+        public void AddPersonList(Queue<Person> persons)
         {
-            _persons.AddRange(persons.ToList());
+            foreach (var person in persons)
+            {
+                _persons.Enqueue(person);
+            }
         }
 
         private void Work()
         {
+            const ConsoleKey CommandDiagnoseDetail = ConsoleKey.NumPad1;
+            const ConsoleKey CommandFixCar = ConsoleKey.NumPad2;
+            const ConsoleKey CommandNextClient = ConsoleKey.NumPad3;
+            const ConsoleKey CommandBuySpareParts = ConsoleKey.NumPad4;
+            const ConsoleKey CommandExitProgram = ConsoleKey.Escape;
+               
+            Person person = _persons.Dequeue();
+
             while (_persons.Count > 0 && _money >= 0)
             {
                 _storage.ShowInfo();
+
+                ConsoleKey key = Console.ReadKey(true).Key;
+
+                switch (key)
+                {
+                    case CommandDiagnoseDetail:
+                        DiagnoseDetail(_clientCar = person.GiveAwayCar());
+                        break;
+
+                    case CommandFixCar:
+                        FixCar();
+                        break;
+
+                    case CommandNextClient:
+                        
+                        break;
+
+                    case CommandBuySpareParts:
+
+                        break;
+
+                    case CommandExitProgram:
+
+                        break;
+                }
             }
         }
 
-        private void FixCarDetail(Detail detail)
+
+        private Person GiveNextClient()
         {
-            detail.Fix();
+            
+        }
+        
+        private void DiagnoseDetail(Car car)
+        {
+            Console.Write("у машины :");
+            _detailsCar = new List<Detail>(car.RemoveDetail());
+
+            foreach (var detail in _detailsCar)
+            {
+                if (detail.IsWhole == false)
+                {
+                    Console.Write($"\n Сломан : {detail.Name}");
+                    _brokenParts.Add(detail);
+                }
+            }
+
+            CalculateRepairCost();
+        }
+
+        private void CalculateRepairCost()
+        {
+            if (_brokenParts.Count == 0)
+                return;
+
+            foreach (var part in _brokenParts)
+            {
+                _priceRepair += Convert.ToInt32(part.Price * _repairPercentage);
+            }
+        }
+
+        private void FixCar()
+        {
+            if (_detailsCar.Count == 0)
+                return;
+
+            Detail detail;
+
+            foreach (var part in _brokenParts)
+            {
+                detail = _storage.GiveDetail(part.Name);
+                
+                if(detail == null)
+                    Console.WriteLine($"У вас нет данной дитали {part.Name}. \nЗакажите ее в магазине!");
+                else
+                    Repair(detail);
+                
+            }
+            
+            _clientCar.ReturnParts(_detailsCar.ToArray());//вынести в другой метод
+            _detailsCar.Clear();                          //вынести в другой метод
+            _brokenParts.Clear();                         //вынести в другой метод
+            _money += _priceRepair;                       //вынести в другой метод
+            _priceRepair = 0;                             //вынести в другой метод
+        }
+
+        private void Repair(Detail detail)
+        {
+            if (detail == null)
+                return;
+
+            for (int i = 0; i < _detailsCar.Count; i++)
+            {
+                if (_detailsCar[i].Name == detail.Name)
+                {
+                    _detailsCar[i] = detail;
+                }
+            }
         }
 
         private bool TryPau(int price)
@@ -228,7 +328,7 @@ namespace Car_Service
 
         public static bool GetBoolRandom()
         {
-            return _random.Next(1) == 0;
+            return _random.Next(1 + 1) == 0;
         }
     }
 
@@ -241,6 +341,13 @@ namespace Car_Service
             IsWhole = isWhole;
         }
 
+        public Detail(Detail detail)
+        {
+            Name = detail.Name;
+            Price = detail.Price;
+            IsWhole = detail.IsWhole;
+        }
+
         public int Price { get; }
         public string Name { get; }
         public bool IsWhole { get; private set; }
@@ -250,11 +357,6 @@ namespace Car_Service
             string stats = GetStats();
 
             Console.WriteLine($"{Name}|{stats}");
-        }
-
-        public void Fix()
-        {
-            IsWhole = true;
         }
 
         private string GetStats()
@@ -303,7 +405,6 @@ namespace Car_Service
     public class MainBuilder
     {
         private PartsConfig _partsConfig = new PartsConfig();
-        private ShopConfig _shopConfig = new ShopConfig();
         private DetailFactory _detailFactory = new DetailFactory();
         private ContainerConfig _containerConfig = new ContainerConfig();
         private ServiceConfig _serviceConfig = new ServiceConfig();
@@ -318,7 +419,7 @@ namespace Car_Service
             _carFactory = new CarFactory(_detailFactory, _partsConfig);
             _personListBuilder = new PersonListBuilder(_carFactory);
             _containerBuilder = new ContainerBuilder(_detailFactory, _partsConfig, _containerConfig);
-            _serviceBuilder = new ServiceBuilder(_containerBuilder, _personListBuilder, _shopConfig, _serviceConfig);
+            _serviceBuilder = new ServiceBuilder(_containerBuilder, _personListBuilder, _serviceConfig);
         }
 
         public Service BuildService()
@@ -331,19 +432,16 @@ namespace Car_Service
     {
         private readonly ContainerBuilder _containerBuilder;
         private readonly PersonListBuilder _personListBuilder;
-        private readonly ShopConfig _shopConfig;
         private readonly ServiceConfig _serviceConfig;
 
         public ServiceBuilder(
             ContainerBuilder containerBuilder,
             PersonListBuilder personListBuilder,
-            ShopConfig shopConfig,
             ServiceConfig serviceConfig
         )
         {
             _containerBuilder = containerBuilder;
             _personListBuilder = personListBuilder;
-            _shopConfig = shopConfig;
             _serviceConfig = serviceConfig;
         }
 
@@ -352,8 +450,9 @@ namespace Car_Service
             Storage storage = new Storage(_containerBuilder.CreateNewCollections());
             ShopContainerDetail shop =
                 new ShopContainerDetail(_containerBuilder.CreateNewCollections().Values.ToList());
-            List<Person> persons = _personListBuilder.Build(_serviceConfig.MinPersonList, _serviceConfig.MaxPersonList);
-            return new Service(storage, persons,_personListBuilder, shop, _serviceConfig, _serviceConfig.Money);
+            Queue<Person> persons =
+                _personListBuilder.Build(_serviceConfig.MinPersonList, _serviceConfig.MaxPersonList);
+            return new Service(storage, persons, _personListBuilder, shop, _serviceConfig, _serviceConfig.Money);
         }
     }
 
@@ -408,8 +507,10 @@ namespace Car_Service
             _carFactory = carFactory;
         }
 
-        public List<Person> Build(int minCountQueue, int maxCountQueue) =>
-            AddPersons(minCountQueue, maxCountQueue);
+        public Queue<Person> Build(int minCountQueue, int maxCountQueue)
+        {
+            return AddPersons(minCountQueue, maxCountQueue);
+        }
 
         private Person CreatePerson()
         {
@@ -418,22 +519,21 @@ namespace Car_Service
             return new Person(car);
         }
 
-        private List<Person> AddPersons(int minValue, int maxValue)
+        private Queue<Person> AddPersons(int minValue, int maxValue)
         {
-            List<Person> persons = new List<Person>();
-            Person person;
+            Queue<Person> persons = new Queue<Person>();
 
             for (int i = 0; i < Utils.GetRandomNumber(minValue, maxValue); i++)
             {
-                person = CreatePerson();
-                persons.Add(person);
+                Person person = CreatePerson();
+                persons.Enqueue(person);
             }
 
             return persons;
         }
     }
 
-    public class ServiceConfig
+    public   class ServiceConfig
     {
         public int MaxPersonList { get; } = 50;
         public int MinPersonList { get; } = 5;
@@ -460,11 +560,6 @@ namespace Car_Service
     public class ContainerConfig
     {
         public int MaxCountDetail = 15;
-    }
-
-    public class ShopConfig
-    {
-        public int SellCountDetail { get; } = 10;
     }
 
     public class Part
