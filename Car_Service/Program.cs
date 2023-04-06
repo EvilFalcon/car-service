@@ -540,7 +540,7 @@ namespace Car_Service
 
     public class ContainerConfig
     {
-        public int MaxCountDetail = 15000000;
+        public int MaxCountDetail = 15;
     }
 
     public class Part
