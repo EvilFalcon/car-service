@@ -240,9 +240,9 @@ namespace Car_Service
 
         private void CalculateRepairCost()
         {
-            foreach (var part in _brokenDetails)
+            foreach (var detail in _brokenDetails)
             {
-                _priceRepair += Convert.ToInt32(part.Price * _repairPercentage);
+                _priceRepair += Convert.ToInt32(detail.Price * _repairPercentage);
             }
         }
 
