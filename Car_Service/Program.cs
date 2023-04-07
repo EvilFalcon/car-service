@@ -80,8 +80,8 @@ namespace Car_Service
     {
         private Queue<Detail> _details = new Queue<Detail>();
 
-        public bool HesDetails => _details.Count > 0;
-        public int DitailCount => _details.Count;
+        public bool HasDetails => _details.Count > 0;
+        public int DetailCount => _details.Count;
 
         public Detail GiveDetail() =>
             _details.Dequeue();
@@ -106,7 +106,7 @@ namespace Car_Service
 
             Container container = _contaners[nameDetails];
 
-            if (_contaners[nameDetails].HesDetails == false)
+            if (_contaners[nameDetails].HasDetails == false)
                 return null;
 
             return container.GiveDetail();
@@ -119,7 +119,7 @@ namespace Car_Service
             foreach (var contaner in _contaners)
             {
                 string contanerName = contaner.Key;
-                int details = contaner.Value.DitailCount;
+                int details = contaner.Value.DetailCount;
 
                 Console.WriteLine($"{contanerName}  {details}");
             }
