@@ -41,14 +41,14 @@ namespace Car_Service
         {
             List<Detail> filmedDetails = new List<Detail>();
 
-            for (int i = 0; i < _details.Count; i++)
+            foreach (var detail in _details)
             {
-                if (_details[i].IsNotBroken == false)
-                {
-                    filmedDetails.Add(_details[i]);
-                }
+                if (detail.IsNotBroken == false)
+                {                                    
+                    filmedDetails.Add(detail);  
+                }                                    
             }
-
+                                                     
             foreach (var filmedDetail in filmedDetails)
             {
                 _details.Remove(filmedDetail);
@@ -80,18 +80,6 @@ namespace Car_Service
     {
         private Queue<Detail> _details = new Queue<Detail>();
 
-        public Container(Container container)
-        {
-            _details = new Queue<Detail>(container._details);
-            Name = container.Name;
-        }
-
-        public Container(string name)
-        {
-            Name = name;
-        }
-
-        public string Name { get; private set; }
         public bool HesDetails => _details.Count > 0;
         public int DitailCount => _details.Count;
 
@@ -294,12 +282,6 @@ namespace Car_Service
     {
         private static Random _random = new Random();
 
-        public static int GetRandomNumber(int value)
-        {
-            int number = _random.Next(value + 1);
-            return number;
-        }
-
         public static int GetRandomNumber(int minValue, int maxValue)
         {
             return _random.Next(minValue, maxValue + 1);
@@ -435,7 +417,7 @@ namespace Car_Service
 
         private Container Create(Part part)
         {
-            Container container = new Container(part.Name);
+            Container container = new Container();
 
             for (int i = 0; i < _containerConfig.MaxCountDetails; i++)
             {
