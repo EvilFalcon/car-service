@@ -220,19 +220,17 @@ namespace Car_Service
 
             Console.Write("У машины ");
 
-            if (_brokenDetails.Count > 0)
-            {
-                Console.Write(": Сломан -");
-
-                foreach (var detail in _brokenDetails)
-                {
-                    Console.WriteLine($"{detail.Name}");
-                }
-            }
-            else
+            if (_brokenDetails.Count < 0)
             {
                 Console.WriteLine(": Ничего не сломанно");
                 return;
+            }
+
+            Console.Write(": Сломан -");
+
+            foreach (var detail in _brokenDetails)
+            {
+                Console.WriteLine($"{detail.Name}");
             }
 
             CalculateRepairCost();
